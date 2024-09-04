@@ -156,6 +156,17 @@ where
         // Create the partial extrinsic with the refined params:
         self.create_partial_signed_offline(call, params)
     }
+    pub async fn create_partial_signed_no_refine<Call>(
+        &self,
+        call: &Call,
+        params: <T::ExtrinsicParams as ExtrinsicParams<T>>::Params,
+    ) -> Result<PartialExtrinsic<T, C>, Error>
+    where
+        Call: Payload,
+    {
+        // Create the partial extrinsic with the refined params:
+        self.create_partial_signed_offline(call, params)
+    }
 
     /// Creates a signed extrinsic, without submitting it.
     pub async fn create_signed<Call, Signer>(
@@ -176,6 +187,29 @@ where
         //    ready to be signed.
         let partial_signed = self
             .create_partial_signed(call, &signer.account_id(), params)
+            .await?;
+
+        // 3. Sign and construct an extrinsic from these details.
+        Ok(partial_signed.sign(signer))
+    }
+    pub async fn create_signed_no_refine<Call, Signer>(
+        &self,
+        call: &Call,
+        signer: &Signer,
+        params: <T::ExtrinsicParams as ExtrinsicParams<T>>::Params,
+    ) -> Result<SubmittableExtrinsic<T, C>, Error>
+    where
+        Call: Payload,
+        Signer: SignerT<T>,
+    {
+        // 1. Validate this call against the current node metadata if the call comes
+        // with a hash allowing us to do so.
+        self.validate(call)?;
+
+        // 2. Gather the "additional" and "extra" params along with the encoded call data,
+        //    ready to be signed.
+        let partial_signed = self
+            .create_partial_signed_no_refine(call, params)
             .await?;
 
         // 3. Sign and construct an extrinsic from these details.
@@ -216,6 +250,21 @@ where
         Signer: SignerT<T>,
     {
         self.create_signed(call, signer, params)
+            .await?
+            .submit_and_watch()
+            .await
+    }
+    pub async fn sign_and_submit_then_watch_no_refine<Call, Signer>(
+        &self,
+        call: &Call,
+        signer: &Signer,
+        params: <T::ExtrinsicParams as ExtrinsicParams<T>>::Params,
+    ) -> Result<TxProgress<T, C>, Error>
+    where
+        Call: Payload,
+        Signer: SignerT<T>,
+    {
+        self.create_signed_no_refine(call, signer, params)
             .await?
             .submit_and_watch()
             .await
